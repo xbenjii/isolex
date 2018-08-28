@@ -1,11 +1,12 @@
 import { expect } from 'chai';
-import { ineeda } from 'ineeda';
-import { Container } from 'noicejs';
-import { spy } from 'sinon';
+import { ConsoleLogger, Container } from 'noicejs';
 
-import { Cooldown, CooldownOptions } from 'src/util/Cooldown';
 import { defer } from 'src/utils';
+import { Cooldown, CooldownOptions } from 'src/utils/Cooldown';
 import { describeAsync, itAsync } from 'test/helpers/async';
+
+const COOLDOWN_NAME = 'test-cooldown';
+const COOLDOWN_STEPS = [10, 12, 16, 24];
 
 describeAsync('cooldown', async () => {
   itAsync('should change the rate by the growth', async () => {
@@ -15,18 +16,20 @@ describeAsync('cooldown', async () => {
     const cd = await ctr.create<Cooldown, CooldownOptions>(Cooldown, {
       config: {
         base: 10,
-        grow: 2
-      }
+        grow: 2,
+        name: COOLDOWN_NAME,
+      },
+      logger: ConsoleLogger.global,
     });
 
-    expect(cd.inc()).to.equal(12);
-    expect(cd.inc()).to.equal(16);
-    expect(cd.inc()).to.equal(24);
-    expect(cd.dec()).to.equal(16);
-    expect(cd.dec()).to.equal(12);
-    expect(cd.dec()).to.equal(10);
-    expect(cd.dec()).to.equal(10);
-    expect(cd.getRate()).to.equal(10);
+    expect(cd.inc()).to.equal(COOLDOWN_STEPS[1]);
+    expect(cd.inc()).to.equal(COOLDOWN_STEPS[2]);
+    expect(cd.inc()).to.equal(COOLDOWN_STEPS[3]);
+    expect(cd.dec()).to.equal(COOLDOWN_STEPS[2]);
+    expect(cd.dec()).to.equal(COOLDOWN_STEPS[1]);
+    expect(cd.dec()).to.equal(COOLDOWN_STEPS[0]);
+    expect(cd.dec()).to.equal(COOLDOWN_STEPS[0]);
+    expect(cd.getRate()).to.equal(COOLDOWN_STEPS[0]);
   });
 
   itAsync('should stop a pending timer', async () => {
@@ -36,12 +39,14 @@ describeAsync('cooldown', async () => {
     const cd = await ctr.create<Cooldown, CooldownOptions>(Cooldown, {
       config: {
         base: 5000,
-        grow: 0
-      }
+        grow: 0,
+        name: COOLDOWN_NAME,
+      },
+      logger: ConsoleLogger.global,
     });
 
-    cd.start();
-    cd.stop();
+    await cd.start();
+    await cd.stop();
   });
 
   itAsync('should track ticks', async () => {
@@ -51,8 +56,10 @@ describeAsync('cooldown', async () => {
     const cd = await ctr.create<Cooldown, CooldownOptions>(Cooldown, {
       config: {
         base: 20,
-        grow: 0
-      }
+        grow: 0,
+        name: COOLDOWN_NAME,
+      },
+      logger: ConsoleLogger.global,
     });
 
     await cd.start();

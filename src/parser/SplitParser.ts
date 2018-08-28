@@ -1,78 +1,48 @@
-import { flatten } from 'lodash';
-import { Logger } from 'noicejs/logger/Logger';
-import { Bot } from 'src/Bot';
-import { Command, CommandType } from 'src/Command';
-import { Message } from 'src/Message';
+import { isEmpty, trim } from 'lodash';
+import * as split from 'split-string';
+import { Command, CommandType } from 'src/entity/Command';
+import { Message } from 'src/entity/Message';
 import { BaseParser } from 'src/parser/BaseParser';
-import { Parser } from 'src/parser/Parser';
+import { Parser, ParserConfig } from 'src/parser/Parser';
+import { ServiceOptions } from 'src/Service';
 
-export interface SplitParserConfig {
-  delims?: Array<string>;
-  name: string;
-  regexp?: string;
-  tags: Array<string>;
+export interface SplitParserConfig extends ParserConfig {
+  /**
+   * Split every individual character.
+   */
+  every: boolean;
+
+  /**
+   * Split options for delimiters, brackets, etc.
+   */
+  split: SplitString.SplitOptions;
 }
 
-export interface SplitParserOptions {
-  bot: Bot;
-  config: SplitParserConfig;
-  logger: Logger;
-}
+export type SplitParserOptions = ServiceOptions<SplitParserConfig>;
 
-export class SplitParser extends BaseParser implements Parser {
-  protected config: SplitParserConfig;
-  protected delims?: Array<string>;
-  protected logger: Logger;
-  protected name: string;
-  protected regexp?: RegExp;
-  protected tags: Array<string>;
-
+export class SplitParser extends BaseParser<SplitParserConfig> implements Parser {
   constructor(options: SplitParserOptions) {
-    super();
-
-    this.config = options.config;
-    this.logger = options.logger.child({
-      class: SplitParser.name
-    });
-    this.name = options.config.name;
-    this.tags = options.config.tags;
-
-    if (options.config.regexp) {
-      this.regexp = new RegExp(options.config.regexp);
-    }
-
-    if (options.config.delims) {
-      this.delims = ['\n'].concat(options.config.delims);
-    }
+    super(options);
   }
 
   public async parse(msg: Message): Promise<Array<Command>> {
     const body = this.removeTags(msg.body);
-    const args = this.split(body);
+    const args = this.split(body).map(trim).filter((it) => !isEmpty(it));
+    this.logger.debug({ args, body }, 'splitting string');
 
-    return [new Command({
+    return [Command.create({
       context: msg.context,
       data: { args },
       name: this.name,
-      type: CommandType.None
+      type: CommandType.None,
     })];
   }
 
   public split(msg: string): Array<string> {
-    if (this.regexp) {
-      const args = msg.match(this.regexp);
-      this.logger.debug({ args }, 'splitting on regexp');
-      if (args) {
-        return Array.from(args);
-      } else {
-        throw new Error('unable to split message on regexp');
-      }
-    } else if (this.delims) {
-      const args = this.delims.reduce((p, d) => flatten(p.map((i) => i.split(d))), [msg]).filter((i) => !!i);
-      this.logger.debug({ args }, 'splitting on delimiters');
-      return args;
+    if (this.config.every) {
+      return msg.split('');
     } else {
-      throw new Error('unable to split message');
+      return split(msg, this.config.split);
     }
   }
 }

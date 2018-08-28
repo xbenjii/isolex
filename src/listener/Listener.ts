@@ -1,5 +1,6 @@
-import { Command } from 'src/Command';
-import { Message } from 'src/Message';
+import { Command } from 'src/entity/Command';
+import { Context } from 'src/entity/Context';
+import { Message } from 'src/entity/Message';
 import { Service } from 'src/Service';
 
 export interface FetchOptions {
@@ -10,7 +11,14 @@ export interface FetchOptions {
   id?: string;
 }
 
+export interface ContextFetchOptions extends FetchOptions {
+  listenerId: string;
+  useFilters: boolean;
+}
+
 export interface Listener extends Service {
+  check(context: Context): Promise<boolean>;
+
   /**
    * Emit a message.
    */

@@ -1,44 +1,35 @@
-// noop parser that passes the incoming message as a field
-
-import { BaseOptions } from 'noicejs/Container';
-import { Logger } from 'noicejs/logger/Logger';
-import { Command, CommandType } from 'src/Command';
-import { Message } from 'src/Message';
+import { Command, CommandType } from 'src/entity/Command';
+import { Message } from 'src/entity/Message';
 import { BaseParser } from 'src/parser/BaseParser';
-import { Parser } from 'src/parser/Parser';
+import { Parser, ParserConfig } from 'src/parser/Parser';
+import { ServiceOptions } from 'src/Service';
 
-export interface EchoParserConfig {
+export interface EchoParserConfig extends ParserConfig {
   field: string;
   name: string;
-  tags: Array<string>;
+  remove: boolean;
 }
 
-export interface EchoParserOptions extends BaseOptions {
-  config: EchoParserConfig;
-  logger: Logger;
-}
+export type EchoParserOptions = ServiceOptions<EchoParserConfig>;
 
-export class EchoParser extends BaseParser implements Parser {
-  protected config: EchoParserConfig;
-
+/**
+ * Forwards the message body as a field. Does not split or otherwise parse, optionally removes the matched tag.
+ *
+ * @TODO: implement optional removal
+ */
+export class EchoParser extends BaseParser<EchoParserConfig> implements Parser {
   constructor(options: EchoParserOptions) {
-    super();
-
-    this.config = options.config;
-    this.logger = options.logger.child({
-      class: EchoParser.name
-    });
-    this.tags = options.config.tags;
+    super(options);
   }
 
   public async parse(msg: Message): Promise<Array<Command>> {
-    return [new Command({
+    return [Command.create({
       context: msg.context,
       data: {
-        [this.config.field]: msg.body
+        [this.config.field]: [this.removeTags(msg.body)],
       },
       name: this.config.name,
-      type: CommandType.None
+      type: CommandType.None,
     })];
   }
 }

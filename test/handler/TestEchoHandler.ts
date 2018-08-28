@@ -1,78 +1,75 @@
 import { expect } from 'chai';
 import { ineeda } from 'ineeda';
-import { ConsoleLogger, Container, Module } from 'noicejs';
-import { Logger } from 'noicejs/logger/Logger';
+import { ConsoleLogger } from 'noicejs';
 import { match, spy } from 'sinon';
 
 import { Bot } from 'src/Bot';
-import { Command } from 'src/Command';
+import { Command } from 'src/entity/Command';
+import { Context } from 'src/entity/Context';
+import { Message } from 'src/entity/Message';
 import { EchoHandler, EchoHandlerOptions } from 'src/handler/EchoHandler';
-import { Message } from 'src/Message';
-import { Template } from 'src/util/Template';
-import { TemplateCompiler } from 'src/util/TemplateCompiler';
+import { Template } from 'src/utils/Template';
+import { TemplateCompiler } from 'src/utils/TemplateCompiler';
 import { describeAsync, itAsync } from 'test/helpers/async';
+import { createContainer } from 'test/helpers/container';
 
 describeAsync('echo handler', async () => {
   itAsync('should exist', async () => {
-    class TestModule extends Module {
-      public async configure() {
-        this.bind('compiler').toConstructor(TemplateCompiler);
-      }
-    }
-
-    const container = Container.from(new TestModule());
-    await container.configure();
+    const { container } = await createContainer();
 
     const options: EchoHandlerOptions = {
       bot: ineeda<Bot>(),
       compiler: ineeda<TemplateCompiler>({
-        compile: () => ineeda<Template>()
+        compile: () => ineeda<Template>(),
       }),
       config: {
         name: 'test_echo',
-        template: ''
+        template: '',
       },
       container,
-      logger: ConsoleLogger.global
+      logger: ConsoleLogger.global,
     };
     const handler = await container.create(EchoHandler, options);
     expect(handler).to.be.an.instanceOf(EchoHandler);
   });
 
   itAsync('should handle commands', async () => {
-    const container = Container.from();
-    await container.configure();
+    const { container } = await createContainer();
 
     const send = spy();
     const options: EchoHandlerOptions = {
       bot: ineeda<Bot>({
-        send
+        send,
       }),
       compiler: ineeda<TemplateCompiler>({
-        compile: () => ineeda<Template>()
+        compile: () => ineeda<Template>({
+          render: () => 'test_echo',
+        }),
       }),
       config: {
         name: 'test_echo',
-        template: ''
+        template: '',
       },
       container,
-      logger: ConsoleLogger.global
+      logger: ConsoleLogger.global,
     };
     const handler = await container.create(EchoHandler, options);
 
-    const cmd = new Command({
-      context: {
+    const cmd = Command.create({
+      context: Context.create({
+        listenerId: '',
         roomId: '',
         threadId: '',
         userId: '',
-        userName: ''
-      },
+        userName: '',
+      }),
       data: {},
-      name: 'test_cmd',
-      type: 0
+      name: 'test_echo',
+      type: 0,
     });
-    const handled = await handler.handle(cmd);
-    expect(handled).to.be.true;
+
+    expect(await handler.check(cmd)).to.equal(true);
+    await handler.handle(cmd);
     expect(send).to.have.been.calledWithMatch(match.instanceOf(Message));
   });
 });

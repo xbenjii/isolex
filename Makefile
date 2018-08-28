@@ -5,8 +5,12 @@ export GIT_REMOTES	= $(shell git remote -v | awk '{ print $1; }' | sort | uniq)
 
 # CI
 export CI_COMMIT_REF_SLUG		?= $(GIT_BRANCH)
+export CI_COMMIT_SHA ?= $(GIT_COMMIT)
 export CI_ENVIRONMENT_SLUG 	?= local
+export CI_JOB_ID ?= 0
 export CI_RUNNER_DESCRIPTION ?= $(shell hostname)
+export CI_RUNNER_ID ?= $(shell hostname)
+export CI_RUNNER_VERSION ?= 0.0.0
 
 # Debug
 export DEBUG_BIND  ?= 127.0.0.1
@@ -29,7 +33,6 @@ export VENDOR_PATH	?= $(ROOT_PATH)/vendor
 NODE_BIN		:= $(ROOT_PATH)/node_modules/.bin
 NODE_CMD		?= $(shell env node)
 NODE_DEBUG	?= --inspect-brk=$(DEBUG_BIND):$(DEBUG_PORT) --nolazy
-NODE_INFO		:= $(shell node -v)
 
 # Tool options
 BUNDLE_OPTS	?= --config "$(CONFIG_PATH)/webpack.js" --display-optimization-bailout --display-error-details
@@ -39,11 +42,22 @@ DOCS_OPTS		?= --exclude "test.+" --tsconfig "$(CONFIG_PATH)/tsconfig.json" --out
 MOCHA_MULTI ?= --reporter mocha-multi --reporter-options json="$(TARGET_PATH)/mocha.json",spec
 MOCHA_OPTS  ?= --check-leaks --colors --max-old-space-size=4096 --sort --ui bdd
 
+# Versions
+export NODE_VERSION		:= $(shell node -v)
+export RUNNER_VERSION  := $(CI_RUNNER_VERSION)
+export WEBPACK_VERSION := $(shell $(NODE_BIN)/webpack -v)
+
 all: configure bundle test ## builds, bundles, and tests the application
 	@echo Success! make run-terminal to launch
 
 strict: configure bundle-check test-check ## builds, bundles, and tests the application with type checks and extra warnings (slow)
 	@echo Success! make run-terminal to launch
+
+clean: ## clean up the target directory
+	rm -rf $(TARGET_PATH)
+
+configure: ## create the target directory and other files not in git
+	mkdir -p $(TARGET_PATH)
 
 # from https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 help: ## print this help
@@ -65,21 +79,18 @@ bundle-stats: ## bundle the application and emit statistics
 bundle-watch: ## bundle the application and watch for changes
 	TEST_CHECK=false $(NODE_BIN)/webpack $(BUNDLE_OPTS) --watch
 
-clean: ## clean up the target directory
-	rm -rf $(TARGET_PATH)
-
-configure: ## create the target directory and other files not in git
-	mkdir -p $(TARGET_PATH)
-
-docs: ## generate html docs
+bundle-docs: ## generate html docs
 	$(NODE_BIN)/typedoc $(DOCS_OPTS)
 
-push: ## push to both gitlab and github (this assumes you have both remotes set up)
-	git push gitlab
-	git push github
+git-push: ## push to both gitlab and github (this assumes you have both remotes set up)
+	git push gitlab ${GIT_BRANCH}
+	git push github ${GIT_BRANCH}
 
 run-terminal: ## run the bot in a terminal
 	node $(TARGET_PATH)/main-bundle.js
+
+run-bunyan: ## run the bot with bunyan logs
+	node $(TARGET_PATH)/main-bundle.js | $(NODE_BIN)/bunyan
 
 test: test-check ## run mocha unit tests
 
@@ -98,11 +109,11 @@ test-watch:
 todo:
 	@echo "Remaining tasks:"
 	@echo ""
-	@grep "todo" -r src/
+	@grep "todo" -r src/ || true
 	@echo ""
 	@echo "Pending tests:"
 	@echo ""
-	@grep "[[:space:]]xit" -r $(TEST_PATH)
+	@grep "[[:space:]]xit" -r test/ || true
 
-update: ## check yarn for outdated packages
+yarn-update: ## check yarn for outdated packages
 	yarn -L -C -P '.*'

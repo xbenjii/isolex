@@ -1,8 +1,8 @@
 import * as Handlebars from 'handlebars';
 import { Inject } from 'noicejs';
 import { Logger } from 'noicejs/logger/Logger';
-import { Context } from 'src/Context';
-import { Template } from 'src/util/Template';
+import { Context } from 'src/entity/Context';
+import { Template } from 'src/utils/Template';
 
 export interface TemplateCompilerOptions {
   logger: Logger;
@@ -17,22 +17,22 @@ export class TemplateCompiler {
   constructor(options: TemplateCompilerOptions) {
     this.compiler = Handlebars.create();
     this.logger = options.logger.child({
-      class: TemplateCompiler.name
+      class: TemplateCompiler.name,
     });
     this.options = {};
 
     this.compiler.registerHelper('entries', this.formatEntries.bind(this));
     this.compiler.registerHelper('json', this.formatJSON.bind(this));
-    this.compiler.registerHelper('reply', this.formatDestination.bind(this));
+    this.compiler.registerHelper('reply', this.formatContext.bind(this));
   }
 
   public compile(body: string): Template {
     return new Template({
-      template: this.compiler.compile(body, this.options)
+      template: this.compiler.compile(body, this.options),
     });
   }
 
-  public formatDestination(context: Context): string {
+  public formatContext(context: Context): string {
     return `@${context.userName}`;
   }
 
@@ -46,7 +46,7 @@ export class TemplateCompiler {
     return parts.join('');
   }
 
-  public formatJSON(value: object): string {
-    return JSON.stringify(value);
+  public formatJSON(value: object): hbs.SafeString {
+    return new Handlebars.SafeString(JSON.stringify(value));
   }
 }

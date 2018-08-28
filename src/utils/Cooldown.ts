@@ -1,7 +1,9 @@
 import { Observable, Subject } from 'rxjs';
-import { Service, ServiceOptions } from 'src/Service';
+import { BaseService } from 'src/BaseService';
+import { ServiceConfig, ServiceOptions } from 'src/Service';
 
-export interface CooldownConfig {
+export const GROWTH_FACTOR = 2;
+export interface CooldownConfig extends ServiceConfig {
   base: number;
   grow: number;
 }
@@ -14,7 +16,10 @@ export type CooldownOptions = ServiceOptions<CooldownConfig>;
  * Every time it is increased, the rate of growth for next time increases by the same amount. This is, essentially,
  * an exponential interval with an observable.
  */
-export class Cooldown implements Service {
+export class Cooldown extends BaseService<CooldownConfig> {
+  public readonly id: string;
+  public readonly name: string;
+
   protected active: boolean;
   protected boundNext: Function;
   protected config: CooldownConfig;
@@ -25,6 +30,8 @@ export class Cooldown implements Service {
   protected timer: number;
 
   constructor(options: CooldownOptions) {
+    super(options);
+
     this.active = false;
     this.boundNext = this.next.bind(this);
     this.config = options.config;
@@ -54,7 +61,7 @@ export class Cooldown implements Service {
    * @returns the new rate
    */
   public dec(): number {
-    this.grow = Math.max(this.grow / 2, this.config.grow);
+    this.grow = Math.max(this.grow / GROWTH_FACTOR, this.config.grow);
     this.rate = Math.max(this.rate - this.grow, this.config.base);
     return this.rate;
   }

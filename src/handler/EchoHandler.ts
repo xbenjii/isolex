@@ -1,14 +1,12 @@
 import { Inject } from 'noicejs';
-import { Logger } from 'noicejs/logger/Logger';
-import { Bot } from 'src/Bot';
-import { Command } from 'src/Command';
-import { Handler, HandlerOptions } from 'src/handler/Handler';
-import { Message } from 'src/Message';
-import { Template } from 'src/util/Template';
-import { TemplateCompiler } from 'src/util/TemplateCompiler';
+import { Command } from 'src/entity/Command';
+import { Message } from 'src/entity/Message';
+import { BaseHandler } from 'src/handler/BaseHandler';
+import { Handler, HandlerConfig, HandlerOptions } from 'src/handler/Handler';
+import { Template } from 'src/utils/Template';
+import { TemplateCompiler } from 'src/utils/TemplateCompiler';
 
-export interface EchoHandlerConfig {
-  name: string;
+export interface EchoHandlerConfig extends HandlerConfig {
   template: string;
 }
 
@@ -17,33 +15,17 @@ export interface EchoHandlerOptions extends HandlerOptions<EchoHandlerConfig> {
 }
 
 @Inject('compiler')
-export class EchoHandler implements Handler {
-  protected bot: Bot;
-  protected logger: Logger;
-  protected name: string;
+export class EchoHandler extends BaseHandler<EchoHandlerConfig> implements Handler {
   protected template: Template;
 
   constructor(options: EchoHandlerOptions) {
-    this.bot = options.bot;
-    this.logger = options.logger.child({
-      class: EchoHandler.name
-    });
-    this.name = options.config.name;
+    super(options);
+
     this.template = options.compiler.compile(options.config.template);
   }
 
-  public async handle(cmd: Command): Promise<boolean> {
-    if (cmd.name !== this.name) {
-      return false;
-    }
-
+  public async handle(cmd: Command): Promise<void> {
     this.logger.debug({ cmd }, 'echoing command');
-    const msg = new Message({
-      body: this.template.render({ cmd }),
-      context: cmd.context,
-      reactions: []
-    });
-    await this.bot.send(msg);
-    return true;
+    return this.bot.send(Message.reply(this.template.render({ cmd }), cmd.context));
   }
 }

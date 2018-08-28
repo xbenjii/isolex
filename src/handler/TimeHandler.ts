@@ -1,53 +1,29 @@
-import { Logger } from 'noicejs/logger/Logger';
-import { Bot } from 'src/Bot';
-import { Command } from 'src/Command';
-import { Handler } from 'src/handler/Handler';
-import { Message } from 'src/Message';
+import { defaultTo } from 'lodash';
+import { Command } from 'src/entity/Command';
+import { Message } from 'src/entity/Message';
+import { BaseHandler } from 'src/handler/BaseHandler';
+import { Handler, HandlerConfig, HandlerOptions } from 'src/handler/Handler';
 
-export interface TimeHandlerConfig {
+export interface TimeHandlerConfig extends HandlerConfig {
   locale: string;
   zone: string;
 }
 
-export interface TimeHandlerOptions {
-  bot: Bot;
-  config: TimeHandlerConfig;
-  logger: Logger;
-}
+export type TimeHandlerOptions = HandlerOptions<TimeHandlerConfig>;
 
-export class TimeHandler implements Handler {
-  protected bot: Bot;
-  protected config: TimeHandlerConfig;
-  protected logger: Logger;
+export class TimeHandler extends BaseHandler<TimeHandlerConfig> implements Handler {
   protected template: HandlebarsTemplateDelegate;
 
   constructor(options: TimeHandlerOptions) {
-    this.logger = options.logger.child({
-      class: TimeHandler.name
-    });
-
-    this.bot = options.bot;
-    this.config = options.config;
+    super(options);
   }
 
-  public async handle(cmd: Command): Promise<boolean> {
-    if (cmd.name !== 'test_time') {
-      return false;
-    }
-
-    let timeZone = this.config.zone;
-    if (cmd.has('zone')) {
-      timeZone = cmd.get('zone');
-    }
-
+  public async handle(cmd: Command): Promise<void> {
     const date = new Date();
-    this.logger.debug({date, timeZone, locale: this.config.locale}, 'handling time');
-    const msg = new Message({
-      body: date.toLocaleString(this.config.locale, {timeZone}),
-      context: cmd.context,
-      reactions: []
-    });
-    await this.bot.send(msg);
-    return true;
+    const locale = cmd.getHeadOrDefault('locale', this.config.locale);
+    const zone = cmd.getHeadOrDefault('zone', this.config.zone);
+
+    this.logger.debug({ date, locale, zone }, 'handling time');
+    return this.bot.send(Message.reply(date.toLocaleString(locale, { timeZone: zone }), cmd.context));
   }
 }

@@ -1,35 +1,32 @@
-import { isNumber, isString } from 'lodash';
-import { Logger } from 'noicejs/logger/Logger';
-import { Bot } from 'src/Bot';
-import { Command } from 'src/Command';
+import { BaseFilter } from 'src/filter/BaseFilter';
 import { Filter, FilterBehavior, FilterValue } from 'src/filter/Filter';
-import { Message } from 'src/Message';
+import { ServiceConfig, ServiceOptions } from 'src/Service';
+import { Checklist, ChecklistOptions } from 'src/utils/Checklist';
 
-export interface UserFilterConfig {
-  ignore: Array<number | string>;
-}
+export type UserFilterConfig = ChecklistOptions<string> & ServiceConfig;
 
-export interface UserFilterOptions {
-  bot: Bot;
-  config: UserFilterConfig;
-  logger: Logger;
-}
+export type UserFilterOptions = ServiceOptions<UserFilterConfig>;
 
-export class UserFilter implements Filter {
-  protected ignore: Array<number | string>;
-  protected logger: Logger;
+export class UserFilter extends BaseFilter<UserFilterConfig> implements Filter {
+  protected check: Checklist<string>;
 
   constructor(options: UserFilterOptions) {
-    this.ignore = options.config.ignore;
+    super(options);
+
+    this.check = new Checklist(options.config);
   }
 
-  public async filter(val: FilterValue): Promise<FilterBehavior> {
-    const user = val.context;
-    for (const ignore of this.ignore) {
-      if (user.userId === ignore || user.userName === ignore) {
-        this.logger.debug({ignore, user}, 'filter is ignoring user');
-        return FilterBehavior.Drop;
-      }
+  public async filter(value: FilterValue): Promise<FilterBehavior> {
+    const context = value.context;
+
+    if (!this.check.check(context.userId)) {
+      this.logger.debug({ context }, 'filter ignoring user id');
+      return FilterBehavior.Drop;
+    }
+
+    if (!this.check.check(context.userName)) {
+      this.logger.debug({ context }, 'filter ignoring user name');
+      return FilterBehavior.Drop;
     }
 
     return FilterBehavior.Allow;

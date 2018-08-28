@@ -2,6 +2,13 @@ import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
 import {ineeda} from 'ineeda';
 import * as sinonChai from 'sinon-chai';
+import * as sourceMapSupport from 'source-map-support';
+
+sourceMapSupport.install({
+  environment: 'node',
+  handleUncaughtExceptions: true,
+  hookRequire: true,
+});
 
 /**
  * This will break the whole test run if any test leaks an unhandled rejection.
@@ -18,7 +25,7 @@ chai.use(sinonChai);
 
 ineeda.intercept({
   then: null,
-  unsubscribe: null
+  unsubscribe: null,
 });
 
 const context = (require as any).context('.', true, /Test.*$/);

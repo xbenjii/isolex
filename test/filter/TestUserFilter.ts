@@ -1,60 +1,97 @@
 import * as bunyan from 'bunyan';
 import { expect } from 'chai';
 import { ineeda } from 'ineeda';
-import { Container } from 'noicejs';
+import { ConsoleLogger, Container } from 'noicejs';
 import { Bot } from 'src/Bot';
-import { Command } from 'src/Command';
+import { Command } from 'src/entity/Command';
+import { Context } from 'src/entity/Context';
 import { FilterBehavior } from 'src/filter/Filter';
 import { UserFilter, UserFilterOptions } from 'src/filter/UserFilter';
+import { ChecklistMode } from 'src/utils/Checklist';
 import { describeAsync, itAsync } from 'test/helpers/async';
+import { createContainer } from 'test/helpers/container';
+
+const TEST_FILTER_NAME = 'test-filter';
 
 async function createUserFilter(options: UserFilterOptions) {
-  const container = new Container([]);
-  await container.configure();
+  const { container } = await createContainer();
   const filter = await container.create<UserFilter, any>(UserFilter, {
-    config: {
-      ignore: ['test']
-    }
+    ...options,
+    container,
   });
   return { container, filter };
 }
 
 describeAsync('user filter', async () => {
   itAsync('should have a working helper', async () => {
-    const { container, filter } = await createUserFilter({
+    const { filter } = await createUserFilter({
       bot: ineeda<Bot>(),
       config: {
-        ignore: ['test']
+        data: ['test'],
+        mode: ChecklistMode.EXCLUDE,
+        name: TEST_FILTER_NAME,
       },
+      container: ineeda<Container>(),
       logger: bunyan.createLogger({
-        name: 'test-user-filter'
-      })
+        name: 'test-user-filter',
+      }),
     });
     expect(filter).to.be.an.instanceof(UserFilter);
   });
 
-  itAsync('should filter out commands from banned users', async () => {
-    const { container, filter } = await createUserFilter({
+  itAsync('should allow commands from allowed users', async () => {
+    const { filter } = await createUserFilter({
       bot: ineeda<Bot>(),
       config: {
-        ignore: ['test']
+        data: ['test'],
+        mode: ChecklistMode.EXCLUDE,
+        name: TEST_FILTER_NAME,
       },
-      logger: bunyan.createLogger({
-        name: 'test-user-filter'
-      })
+      container: ineeda<Container>(),
+      logger: ConsoleLogger.global,
     });
-    const cmd = new Command({
-      context: {
+
+    const cmd = Command.create({
+      context: Context.create({
+        listenerId: '',
         roomId: '',
         threadId: '',
         userId: '',
-        userName: 'test'
-      },
+        userName: 'safe',
+      }),
       data: {},
       name: 'test',
-      type: 0
+      type: 0,
     });
     const behavior = await filter.filter(cmd);
     expect(behavior).to.equal(FilterBehavior.Allow);
+  });
+
+  itAsync('should filter out commands from banned users', async () => {
+    const { filter } = await createUserFilter({
+      bot: ineeda<Bot>(),
+      config: {
+        data: ['test'],
+        mode: ChecklistMode.EXCLUDE,
+        name: TEST_FILTER_NAME,
+      },
+      container: ineeda<Container>(),
+      logger: ConsoleLogger.global,
+    });
+
+    const cmd = Command.create({
+      context: Context.create({
+        listenerId: '',
+        roomId: '',
+        threadId: '',
+        userId: '',
+        userName: 'test',
+      }),
+      data: {},
+      name: 'test',
+      type: 0,
+    });
+    const behavior = await filter.filter(cmd);
+    expect(behavior).to.equal(FilterBehavior.Drop);
   });
 });
